@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="mb-4">Cancionero</h1>
+
+<!-- Filtros de búsqueda -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('index') }}" class="row g-3">
+            <div class="col-md-4">
+                <label for="order" class="form-label">Orden de Misa</label>
+                <select name="order" id="order" class="form-select">
+                    <option value="">Todas</option>
+                    {% for op in orden_misa_opciones %}
+                        <option value="{{ op }}" {% if selected_order == op %}selected{% endif %}>{{ op|capitalize }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="time" class="form-label">Tiempo Litúrgico</label>
+                <select name="time" id="time" class="form-select">
+                    <option value="">Todos</option>
+                    {% for op in tiempo_liturgico_opciones %}
+                        <option value="{{ op }}" {% if selected_time == op %}selected{% endif %}>{{ op|capitalize }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="search" class="form-label">Buscar</label>
+                <input type="text" name="search" id="search" class="form-control" placeholder="Título o letra..." value="{{ search or '' }}">
+            </div>
+            <div class="col-md-1 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <h3>Lista de Canciones</h3>
+        {% if songs %}
+            <div class="list-group">
+                {% for song in songs %}
+                    <a href="#" class="list-group-item list-group-item-action song-item" 
+                       data-id="{{ song.id }}"
+                       data-title="{{ song.title|replace('\\', '\\\\')|replace('"', '\\"') }}"
+                       data-lyrics="{{ song.lyrics|replace('\\', '\\\\')|replace('"', '\\"') }}">
+                        <strong>{{ song.title }}</strong> 
+                        <span class="badge bg-secondary">{{ song.category_order }}</span>
+                        <span class="badge bg-info">{{ song.category_time }}</span>
+                        <small class="text-muted d-block">por {{ song.author.username }}</small>
+                    </a>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>No hay canciones disponibles.</p>
+        {% endif %}
+    </div>
+    
+    <div class="col-md-6">
+        <div id="song-viewer" style="display: none;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 id="song-title"></h3>
+                <div>
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-sm btn-outline-secondary" id="transpose-down-whole">-1 tono</button>
+                        <button class="btn btn-sm btn-outline-secondary" id="transpose-down-half">-1/2 tono</button>
+                        <button class="btn btn-sm btn-outline-secondary" id="transpose-up-half">+1/2 tono</button>
+                        <button class="btn btn-sm btn-outline-secondary" id="transpose-up-whole">+1 tono</button>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary ms-2" id="toggle-notation">C >> Do</button>
+                    <button class="btn btn-sm btn-outline-warning ms-1" id="reset-original" title="Restaurar canción original">🔁 Orig</button>
+                </div>
+            </div>
+            <div id="song-lyrics" class="song-lyrics p-3 bg-light rounded" style="white-space: pre-wrap; font-family: monospace;"></div>
+        </div>
+        <div id="no-song-selected" class="alert alert-info text-center">
+            Selecciona una canción para ver la letra y acordes
+        </div>
+    </div>
+</div>
+
+<script>
+    // Variables globales
+    let currentLyrics = '';
+    let originalLyrics = ''; // Guarda la letra original sin modificar
+    let currentTitle = '';
+    let currentTransposition = 0;
+    let currentNotation = 'auto';
+
+    function showSong(id, title, lyrics) {
+        // Guardar la letra original (tal como está en la BD)
+        originalLyrics = lyrics;
+        currentLyrics = lyrics;
+        currentTitle = title;
+        currentTransposition = 0;
+        currentNotation = 'auto';
+        
+        document.getElementById('song-title').innerText = title;
+        document.getElementById('song-viewer').style.display = 'block';
+        document.getElementById('no-song-selected').style.display = 'none';
+        
+        renderSong();
+    }
+    
+    function renderSong() {
+        // Siempre partir de la letra original para cada renderizado
+        let processed = originalLyrics;
+        let notation = currentNotation;
+        
+        // Si es 'auto', detectar automáticamente
+        if (notation === 'auto') {
+            notation = detectNotation(processed);
+            // Actualizar botón
+            document.getElementById('toggle-notation').textContent = 
+                notation === 'latino' ? 'C >> Do' : 'Do >> C';
+        }
+        
+        // Aplicar conversión de notación si está activa
+        if (notation === 'americano') {
+            processed = convertToAmerican(processed);
+        } else if (notation === 'latino') {
+            processed = convertToLatin(processed);
+        }
+        
+        // Aplicar transposición
+        if (currentTransposition !== 0) {
+            processed = transposeLyrics(processed, currentTransposition, notation);
+        }
+        
+        // Resaltar acordes
+        processed = processed.replace(/\[([^\]]+)\]/g, '<span class="chord">[$1]</span>');
+        document.getElementById('song-lyrics').innerHTML = processed;
+    }
+    
+    // Función para resetear al original
+    function resetToOriginal() {
+        currentTransposition = 0;
+        currentNotation = 'auto';
+        document.getElementById('toggle-notation').textContent = '🎵 Auto';
+        renderSong();
+    }
+    
+    // Event Listeners
+    document.addEventListener('DOMContentLoaded', function() {
+        // Clic en canciones
+        document.querySelectorAll('.song-item').forEach(function(link) {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const id = this.dataset.id;
+                const title = this.dataset.title;
+                const lyrics = this.dataset.lyrics;
+                showSong(id, title, lyrics);
+            });
+        });
+        
+        // Botones de transposición
+        document.getElementById('transpose-down-whole').addEventListener('click', function() {
+            currentTransposition -= 2;
+            renderSong();
+        });
+        document.getElementById('transpose-down-half').addEventListener('click', function() {
+            currentTransposition -= 1;
+            renderSong();
+        });
+        document.getElementById('transpose-up-half').addEventListener('click', function() {
+            currentTransposition += 1;
+            renderSong();
+        });
+        document.getElementById('transpose-up-whole').addEventListener('click', function() {
+            currentTransposition += 2;
+            renderSong();
+        });
+        
+        // Botón de cambio de notación
+        document.getElementById('toggle-notation').addEventListener('click', function() {
+            // Ciclo: auto -> latino -> americano -> auto
+            if (currentNotation === 'auto') {
+                currentNotation = 'latino';
+                this.textContent = 'C >> Do';
+            } else if (currentNotation === 'latino') {
+                currentNotation = 'americano';
+                this.textContent = 'Do >> C';
+            } else {
+                currentNotation = 'auto';
+                this.textContent = '🎵 Auto';
+            }
+            renderSong();
+        });
+        
+        // Botón "Orig" - Restaurar original
+        document.getElementById('reset-original').addEventListener('click', function() {
+            resetToOriginal();
+        });
+    });
+</script>
+{% endblock %}

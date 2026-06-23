@@ -1,0 +1,92 @@
+.song-lyrics {
+    line-height: 1.8;
+    font-size: 1.1rem;
+    font-family: 'Courier New', monospace;
+    white-space: pre-wrap;
+}
+
+.song-lyrics .chord {
+    color: #d9534f;
+    font-weight: bold;
+    background-color: #f8f9fa;
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+    margin: 0 2px;
+    border: 1px solid #e9ecef;
+    font-size: 1.05rem;
+}
+
+.song-lyrics .chord:hover {
+    background-color: #e9ecef;
+    cursor: help;
+}
+
+/* Tooltip para mostrar el acorde */
+.song-lyrics .chord::after {
+    content: attr(data-tooltip);
+    display: none;
+    position: absolute;
+    background: #333;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    margin-top: -30px;
+    margin-left: 5px;
+}
+
+.song-lyrics .chord:hover::after {
+    display: inline-block;
+}
+
+/* Botones de control */
+.btn-group .btn {
+    font-size: 0.85rem;
+}
+
+#song-viewer {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 15px;
+}
+
+#song-title {
+    color: #2c3e50;
+    margin: 0;
+    font-weight: bold;
+}
+
+/* Badges de categorías */
+.badge {
+    font-size: 0.75rem;
+    margin-right: 4px;
+}
+
+/* Lista de canciones */
+.song-item {
+    transition: all 0.2s ease;
+}
+
+.song-item:hover {
+    transform: translateX(5px);
+    background-color: #f8f9fa;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .song-lyrics {
+        font-size: 0.95rem;
+    }
+    
+    .song-lyrics .chord {
+        padding: 1px 4px;
+        font-size: 0.95rem;
+    }
+    
+    .btn-group .btn {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+}

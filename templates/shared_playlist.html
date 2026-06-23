@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Lista Compartida: {{ playlist.name }}</h2>
+<p>Creada por {{ playlist.owner.username }}</p>
+
+{% if playlist_songs %}
+    <div class="list-group">
+        {% for ps in playlist_songs %}
+            <div class="list-group-item">
+                <h5>{{ ps.song.title }}</h5>
+                <div class="song-lyrics-preview" style="white-space: pre-wrap; font-family: monospace; max-height: 100px; overflow: hidden;">
+                    {{ ps.song.lyrics|truncate(300) }}
+                </div>
+                <button class="btn btn-sm btn-outline-primary mt-2 view-full-song" 
+                        data-id="{{ ps.song.id }}"
+                        data-title="{{ ps.song.title|replace('\\', '\\\\')|replace('"', '\\"') }}"
+                        data-lyrics="{{ ps.song.lyrics|replace('\\', '\\\\')|replace('"', '\\"') }}">
+                    Ver completa
+                </button>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <p>No hay canciones en esta lista.</p>
+{% endif %}
+
+<!-- Modal para ver canción completa -->
+<div class="modal fade" id="songModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalSongTitle"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-sm btn-outline-secondary" id="modal-transpose-down-whole">-1 tono</button>
+                        <button class="btn btn-sm btn-outline-secondary" id="modal-transpose-down-half">-1/2 tono</button>
+                        <button class="btn btn-sm btn-outline-secondary" id="modal-transpose-up-half">+1/2 tono</button>
+                        <button class="btn btn-sm btn-outline-secondary" id="modal-transpose-up-whole">+1 tono</button>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary ms-2" id="modal-toggle-notation">C >> Do</button>
+                    <button class="btn btn-sm btn-outline-warning ms-1" id="modal-reset-original">🔁 Orig</button>
+                </div>
+                <div id="modalLyrics" class="song-lyrics p-3 bg-light rounded" style="white-space: pre-wrap; font-family: monospace;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Variables para el modal
+    let modalOriginalLyrics = ''; // Guarda la letra original
+    let modalCurrentLyrics = '';
+    let modalCurrentTitle = '';
+    let modalTransposition = 0;
+    let modalNotation = 'auto';
+
+    // Función para renderizar en el modal
+    function renderModalSong() {
+        // Siempre partir de la letra original
+        let processed = modalOriginalLyrics;
+        let notation = modalNotation;
+        
+        if (notation === 'auto') {
+            notation = detectNotation(processed);
+            document.getElementById('modal-toggle-notation').textContent = 
+                notation === 'latino' ? 'C >> Do' : 'Do >> C';
+        }
+        
+        if (notation === 'americano') {
+            processed = convertToAmerican(processed);
+        } else if (notation === 'latino') {
+            processed = convertToLatin(processed);
+        }
+        
+        if (modalTransposition !== 0) {
+            processed = transposeLyrics(processed, modalTransposition, notation);
+        }
+        
+        processed = processed.replace(/\[([^\]]+)\]/g, '<span class="chord">[$1]</span>');
+        document.getElementById('modalLyrics').innerHTML = processed;
+    }
+
+    // Función para resetear al original en el modal
+    function resetModalToOriginal() {
+        modalTransposition = 0;
+        modalNotation = 'auto';
+        document.getElementById('modal-toggle-notation').textContent = '🎵 Auto';
+        renderModalSong();
+    }
+
+    // Función para abrir el modal con una canción
+    function openSongModal(id, title, lyrics) {
+        modalOriginalLyrics = lyrics; // Guardar original
+        modalCurrentLyrics = lyrics;
+        modalCurrentTitle = title;
+        modalTransposition = 0;
+        modalNotation = 'auto';
+        
+        document.getElementById('modalSongTitle').innerText = title;
+        renderModalSong();
+        
+        // Mostrar el modal usando Bootstrap
+        const modal = new bootstrap.Modal(document.getElementById('songModal'));
+        modal.show();
+    }
+
+    // Inicializar eventos cuando el DOM esté listo
+    document.addEventListener('DOMContentLoaded', function() {
+        // Eventos para los botones "Ver completa"
+        document.querySelectorAll('.view-full-song').forEach(function(button) {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                const id = this.dataset.id;
+                const title = this.dataset.title;
+                const lyrics = this.dataset.lyrics;
+                openSongModal(id, title, lyrics);
+            });
+        });
+
+        // Eventos de los botones de transposición en el modal
+        document.getElementById('modal-transpose-down-whole').addEventListener('click', function() {
+            modalTransposition -= 2;
+            renderModalSong();
+        });
+        
+        document.getElementById('modal-transpose-down-half').addEventListener('click', function() {
+            modalTransposition -= 1;
+            renderModalSong();
+        });
+        
+        document.getElementById('modal-transpose-up-half').addEventListener('click', function() {
+            modalTransposition += 1;
+            renderModalSong();
+        });
+        
+        document.getElementById('modal-transpose-up-whole').addEventListener('click', function() {
+            modalTransposition += 2;
+            renderModalSong();
+        });
+
+        // Botón de cambio de notación
+        document.getElementById('modal-toggle-notation').addEventListener('click', function() {
+            if (modalNotation === 'auto') {
+                modalNotation = 'latino';
+                this.textContent = 'C >> Do';
+            } else if (modalNotation === 'latino') {
+                modalNotation = 'americano';
+                this.textContent = 'Do >> C';
+            } else {
+                modalNotation = 'auto';
+                this.textContent = '🎵 Auto';
+            }
+            renderModalSong();
+        });
+
+        // Botón "Orig" - Restaurar original en el modal
+        document.getElementById('modal-reset-original').addEventListener('click', function() {
+            resetModalToOriginal();
+        });
+    });
+</script>
+
+<style>
+    .song-lyrics-preview {
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 5px;
+        border-left: 3px solid #0d6efd;
+    }
+    
+    .view-full-song {
+        margin-top: 10px;
+    }
+    
+    .song-lyrics .chord {
+        color: #d9534f;
+        font-weight: bold;
+        background-color: #f8f9fa;
+        padding: 2px 6px;
+        border-radius: 4px;
+        display: inline-block;
+        margin: 0 2px;
+        border: 1px solid #e9ecef;
+        font-size: 1.05rem;
+    }
+    
+    #modalLyrics {
+        max-height: 500px;
+        overflow-y: auto;
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>{% if song %}Editar{% else %}Nueva{% endif %} Canción</h2>
+<form method="POST">
+    <div class="mb-3">
+        <label>Título</label>
+        <input type="text" name="title" class="form-control" value="{{ song.title if song else '' }}" required>
+    </div>
+    <div class="mb-3">
+        <label>Orden de Misa</label>
+        <select name="category_order" class="form-select" required>
+            {% for op in orden_misa_opciones %}
+                <option value="{{ op }}" {% if song and song.category_order == op %}selected{% endif %}>{{ op|capitalize }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="mb-3">
+        <label>Tiempo Litúrgico</label>
+        <select name="category_time" class="form-select" required>
+            {% for op in tiempo_liturgico_opciones %}
+                <option value="{{ op }}" {% if song and song.category_time == op %}selected{% endif %}>{{ op|capitalize }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="mb-3">
+        <label>Letra con acordes</label>
+        <textarea name="lyrics" rows="15" class="form-control" required placeholder="Ejemplo: [Do] Esto es una canción&#10;[Sol] Con acordes entre corchetes">{% if song %}{{ song.lyrics }}{% endif %}</textarea>
+        <small class="text-muted">Escribe los acordes entre corchetes, por ejemplo: [Do] [Sol] [La menor]</small>
+    </div>
+    <button type="submit" class="btn btn-primary">Guardar</button>
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancelar</a>
+</form>
+{% endblock %}

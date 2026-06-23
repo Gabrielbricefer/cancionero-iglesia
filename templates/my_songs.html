@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Mis Canciones</h2>
+{% if songs %}
+    <div class="list-group">
+        {% for song in songs %}
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>{{ song.title }}</strong>
+                    <span class="badge bg-secondary">{{ song.category_order }}</span>
+                    <span class="badge bg-info">{{ song.category_time }}</span>
+                </div>
+                <div>
+                    <a href="{{ url_for('edit_song', song_id=song.id) }}" class="btn btn-sm btn-warning">Editar</a>
+                    <a href="{{ url_for('delete_song', song_id=song.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('¿Eliminar?')">Eliminar</a>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <p>No has creado canciones aún.</p>
+{% endif %}
+{% endblock %}

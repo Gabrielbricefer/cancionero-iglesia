@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Planificar Misa</h2>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">Crear nueva lista</div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('create_playlist') }}">
+                    <div class="input-group">
+                        <input type="text" name="name" class="form-control" placeholder="Nombre de la lista (ej. Misa del 25)" required>
+                        <button type="submit" class="btn btn-success">Crear</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <h4>Mis Listas</h4>
+        {% if playlists %}
+            {% for pl in playlists %}
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between">
+                        <strong>{{ pl.name }}</strong>
+                        <div>
+                            <a href="{{ url_for('shared_playlist', token=pl.share_token) }}" class="btn btn-sm btn-info" target="_blank">Compartir</a>
+                            <a href="{{ url_for('delete_playlist', playlist_id=pl.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Eliminar lista?')">Eliminar</a>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <h6>Canciones en esta lista:</h6>
+                        {% set playlist_songs = pl.songs|sort(attribute='order_position') %}
+                        {% if playlist_songs %}
+                            <ul class="list-group">
+                                {% for ps in playlist_songs %}
+                                    <li class="list-group-item d-flex justify-content-between">
+                                        {{ ps.song.title }}
+                                        <a href="{{ url_for('remove_song_from_playlist', playlist_song_id=ps.id) }}" class="btn btn-sm btn-outline-danger">Quitar</a>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p class="text-muted">Sin canciones aún.</p>
+                        {% endif %}
+                        <hr>
+                        <form method="POST" action="{{ url_for('add_song_to_playlist') }}" class="mt-2">
+                            <input type="hidden" name="playlist_id" value="{{ pl.id }}">
+                            <div class="input-group">
+                                <select name="song_id" class="form-select" required>
+                                    <option value="">Seleccionar canción</option>
+                                    {% for song in all_songs %}
+                                        <option value="{{ song.id }}">{{ song.title }} ({{ song.author.username }})</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="submit" class="btn btn-primary">Agregar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>No tienes listas creadas.</p>
+        {% endif %}
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">Enlace compartible</div>
+            <div class="card-body">
+                <p>Para compartir una lista, haz clic en "Compartir" y envía el enlace a los músicos.</p>
+                <p>El enlace permite ver la lista sin necesidad de iniciar sesión.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
