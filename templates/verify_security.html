@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0">🔐 Verificación de Seguridad</h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Responde la siguiente pregunta de seguridad para continuar.</p>
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">{{ question }}</label>
+                        <input type="text" class="form-control" name="security_answer" required placeholder="Tu respuesta...">
+                    </div>
+                    <button type="submit" class="btn btn-info w-100">Verificar Respuesta</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

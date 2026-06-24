@@ -1,15 +1,17 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, abort
+from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, Song, Playlist, PlaylistSong
 import secrets
-import re
+from datetime import datetime
 
 app = Flask(__name__)
 
 # Configuración
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'clave-por-defecto-cambiar-en-produccion')
+
+# Base de datos
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(basedir, 'cancionero.db')
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
@@ -26,22 +28,22 @@ def load_user(user_id):
 
 with app.app_context():
     db.create_all()
-    
-    # ========== CREAR SUPERUSUARIO POR DEFECTO ==========
-    # Comentado para evitar creación automática del usuario 'admin'
-    # admin = User.query.filter_by(username='admin').first()
-    # if not admin:
-    #     admin = User(
-    #         username='admin',
-    #         password_hash=generate_password_hash('admin123'),
-    #         is_admin=True,
-    #         is_blocked=False
-    #     )
-    #     db.session.add(admin)
-    #     db.session.commit()
-    #     print("Superusuario 'admin' creado con contraseña 'admin123'")
+    # Crear superusuario si no existe
+    admin = User.query.filter_by(username='admin').first()
+    if not admin:
+        admin = User(
+            username='admin',
+            password_hash=generate_password_hash('admin123'),
+            is_admin=True,
+            is_blocked=False,
+            security_question='¿Cuál es tu color favorito?',
+            security_answer=generate_password_hash('azul')
+        )
+        db.session.add(admin)
+        db.session.commit()
+        print("Superusuario 'admin' creado con contraseña 'admin123'")
 
-# ========== DECORADOR PARA VERIFICAR ADMIN ==========
+# ========== DECORADOR ADMIN ==========
 def admin_required(f):
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated or not current_user.is_admin:
@@ -93,7 +95,6 @@ def login():
         user = User.query.filter_by(username=username).first()
         
         if user and check_password_hash(user.password_hash, password):
-            # Verificar si el usuario está bloqueado
             if user.is_blocked:
                 flash('Esta cuenta ha sido bloqueada. Contacta al administrador.', 'danger')
                 return render_template('login.html')
@@ -114,22 +115,51 @@ def register():
     
     if request.method == 'POST':
         username = request.form['username']
+        email = request.form.get('email')
         password = request.form['password']
         confirm = request.form['confirm_password']
+        security_question = request.form['security_question']
+        security_answer = request.form['security_answer']
         
-        if password != confirm:
-            flash('Las contraseñas no coinciden', 'danger')
+        # Validaciones
+        if not username or len(username) < 3:
+            flash('El nombre de usuario debe tener al menos 3 caracteres.', 'danger')
         elif User.query.filter_by(username=username).first():
-            flash('El nombre de usuario ya existe', 'danger')
+            flash('El nombre de usuario ya existe.', 'danger')
+        elif email and User.query.filter_by(email=email).first():
+            flash('Este correo electrónico ya está registrado.', 'danger')
+        elif password != confirm:
+            flash('Las contraseñas no coinciden.', 'danger')
+        elif len(password) < 6:
+            flash('La contraseña debe tener al menos 6 caracteres.', 'danger')
+        elif not security_question or not security_answer:
+            flash('La pregunta y respuesta de seguridad son obligatorias.', 'danger')
         else:
             hashed = generate_password_hash(password)
-            user = User(username=username, password_hash=hashed)
+            hashed_answer = generate_password_hash(security_answer.lower().strip())
+            user = User(
+                username=username,
+                email=email if email else None,
+                password_hash=hashed,
+                security_question=security_question,
+                security_answer=hashed_answer
+            )
             db.session.add(user)
             db.session.commit()
-            flash('Registro exitoso, ahora puedes iniciar sesión', 'success')
+            flash('Registro exitoso. Ahora puedes iniciar sesión.', 'success')
             return redirect(url_for('login'))
     
-    return render_template('register.html')
+    # Preguntas de seguridad predefinidas
+    security_questions = [
+        '¿Cuál es el nombre de tu primera mascota?',
+        '¿Cuál es el nombre de tu mejor amigo de la infancia?',
+        '¿Cuál es tu comida favorita?',
+        '¿Cuál es el nombre de tu madre?',
+        '¿Cuál es tu color favorito?',
+        '¿En qué ciudad naciste?'
+    ]
+    
+    return render_template('register.html', security_questions=security_questions)
 
 @app.route('/logout')
 @login_required
@@ -138,11 +168,108 @@ def logout():
     flash('Sesión cerrada', 'info')
     return redirect(url_for('index'))
 
+# ========== RECUPERACIÓN DE CONTRASEÑA (SIN EMAIL) ==========
+@app.route('/forgot_password', methods=['GET', 'POST'])
+def forgot_password():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        username = request.form['username']
+        user = User.query.filter_by(username=username).first()
+        
+        if user and user.security_question:
+            # Guardar en sesión para el siguiente paso
+            session['reset_username'] = username
+            return redirect(url_for('verify_security_answer'))
+        else:
+            flash('Usuario no encontrado o no tiene pregunta de seguridad configurada.', 'danger')
+    
+    return render_template('forgot_password.html')
+
+@app.route('/verify_security_answer', methods=['GET', 'POST'])
+def verify_security_answer():
+    if 'reset_username' not in session:
+        return redirect(url_for('forgot_password'))
+    
+    username = session['reset_username']
+    user = User.query.filter_by(username=username).first()
+    
+    if not user:
+        flash('Usuario no encontrado.', 'danger')
+        return redirect(url_for('forgot_password'))
+    
+    if request.method == 'POST':
+        answer = request.form['security_answer']
+        if check_password_hash(user.security_answer, answer.lower().strip()):
+            # Respuesta correcta - permitir cambiar contraseña
+            session['reset_allowed'] = True
+            return redirect(url_for('reset_password'))
+        else:
+            flash('Respuesta incorrecta. Intenta nuevamente.', 'danger')
+    
+    return render_template('verify_security.html', question=user.security_question)
+
+@app.route('/reset_password', methods=['GET', 'POST'])
+def reset_password():
+    if 'reset_allowed' not in session or not session['reset_allowed']:
+        flash('No tienes permiso para acceder a esta página.', 'danger')
+        return redirect(url_for('forgot_password'))
+    
+    if request.method == 'POST':
+        password = request.form['password']
+        confirm = request.form['confirm_password']
+        
+        if not password or len(password) < 6:
+            flash('La contraseña debe tener al menos 6 caracteres.', 'danger')
+        elif password != confirm:
+            flash('Las contraseñas no coinciden.', 'danger')
+        else:
+            username = session.get('reset_username')
+            user = User.query.filter_by(username=username).first()
+            if user:
+                user.password_hash = generate_password_hash(password)
+                db.session.commit()
+                # Limpiar sesión
+                session.pop('reset_username', None)
+                session.pop('reset_allowed', None)
+                flash('Tu contraseña ha sido restablecida exitosamente. Ahora puedes iniciar sesión.', 'success')
+                return redirect(url_for('login'))
+    
+    return render_template('reset_password.html')
+
+# ========== CAMBIAR CONTRASEÑA (DESDE SESIÓN INICIADA) ==========
+@app.route('/change_password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    if request.method == 'POST':
+        current_password = request.form['current_password']
+        new_password = request.form['new_password']
+        confirm_password = request.form['confirm_password']
+        
+        if not check_password_hash(current_user.password_hash, current_password):
+            flash('La contraseña actual es incorrecta.', 'danger')
+            return render_template('change_password.html')
+        
+        if not new_password or len(new_password) < 6:
+            flash('La nueva contraseña debe tener al menos 6 caracteres.', 'danger')
+            return render_template('change_password.html')
+        
+        if new_password != confirm_password:
+            flash('Las contraseñas no coinciden.', 'danger')
+            return render_template('change_password.html')
+        
+        current_user.password_hash = generate_password_hash(new_password)
+        db.session.commit()
+        flash('Tu contraseña ha sido actualizada exitosamente.', 'success')
+        return redirect(url_for('index'))
+    
+    return render_template('change_password.html')
+
 # ========== GESTIÓN DE CANCIONES ==========
 @app.route('/create_song', methods=['GET', 'POST'])
 @login_required
 def create_song():
-    # Verificar si el usuario está bloqueado
     if current_user.is_blocked:
         flash('Tu cuenta está bloqueada. No puedes crear canciones.', 'danger')
         return redirect(url_for('index'))
@@ -182,12 +309,10 @@ def create_song():
 def edit_song(song_id):
     song = Song.query.get_or_404(song_id)
     
-    # Permitir edición si es el autor O si es administrador
     if song.user_id != current_user.id and not current_user.is_admin:
         flash('No tienes permiso para editar esta canción', 'danger')
         return redirect(url_for('index'))
     
-    # Verificar si el usuario está bloqueado (excepto admin)
     if current_user.is_blocked and not current_user.is_admin:
         flash('Tu cuenta está bloqueada.', 'danger')
         return redirect(url_for('index'))
@@ -215,7 +340,6 @@ def edit_song(song_id):
 def delete_song(song_id):
     song = Song.query.get_or_404(song_id)
     
-    # Permitir eliminación si es el autor O si es administrador
     if song.user_id != current_user.id and not current_user.is_admin:
         flash('No autorizado', 'danger')
         return redirect(url_for('index'))
@@ -262,7 +386,6 @@ def admin_users():
 def admin_toggle_block(user_id):
     user = User.query.get_or_404(user_id)
     
-    # No permitir bloquear al propio admin
     if user.id == current_user.id:
         flash('No puedes bloquearte a ti mismo', 'danger')
         return redirect(url_for('admin_users'))

@@ -318,6 +318,28 @@ function renderSongWithAutoDetect(lyrics, transposition = 0, notation = null) {
 }
 
 // ============================================================
+// MOSTRAR/OCULTAR CONTRASEÑA (Toggle Password)
+// ============================================================
+document.addEventListener('DOMContentLoaded', function() {
+    const toggleButtons = document.querySelectorAll('.toggle-password');
+    
+    toggleButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const input = this.parentElement.querySelector('input[type="password"], input[type="text"]');
+            if (input) {
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    this.innerHTML = '<i class="bi bi-eye-slash"></i>';
+                } else {
+                    input.type = 'password';
+                    this.innerHTML = '<i class="bi bi-eye"></i>';
+                }
+            }
+        });
+    });
+});
+
+// ============================================================
 // EXPORTAR FUNCIONES GLOBALES
 // ============================================================
 window.transposeChord = transposeChord;

@@ -12,15 +12,45 @@
                     <div class="mb-3">
                         <label for="username" class="form-label">Nombre de usuario</label>
                         <input type="text" class="form-control" id="username" name="username" required>
-                        <div class="form-text">Mínimo 3 caracteres, solo letras y números.</div>
+                        <div class="form-text">Mínimo 3 caracteres.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Correo Electrónico (opcional)</label>
+                        <input type="email" class="form-control" id="email" name="email">
                     </div>
                     <div class="mb-3">
                         <label for="password" class="form-label">Contraseña</label>
-                        <input type="password" class="form-control" id="password" name="password" required>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="password" name="password" required>
+                            <button class="btn btn-outline-secondary toggle-password" type="button">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">Mínimo 6 caracteres.</div>
                     </div>
                     <div class="mb-3">
                         <label for="confirm_password" class="form-label">Confirmar contraseña</label>
-                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                            <button class="btn btn-outline-secondary toggle-password" type="button">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="security_question" class="form-label">Pregunta de Seguridad</label>
+                        <select class="form-select" id="security_question" name="security_question" required>
+                            <option value="">Selecciona una pregunta...</option>
+                            {% for question in security_questions %}
+                                <option value="{{ question }}">{{ question }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Necesaria para recuperar tu contraseña.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="security_answer" class="form-label">Respuesta de Seguridad</label>
+                        <input type="text" class="form-control" id="security_answer" name="security_answer" required>
+                        <div class="form-text">Recuerda esta respuesta, la necesitarás para recuperar tu contraseña.</div>
                     </div>
                     <button type="submit" class="btn btn-primary w-100">Registrarse</button>
                 </form>

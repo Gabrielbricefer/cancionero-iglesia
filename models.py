@@ -8,12 +8,14 @@ class User(UserMixin, db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), nullable=True)
     password_hash = db.Column(db.String(200), nullable=False)
-    is_admin = db.Column(db.Boolean, default=False)  # Nuevo: es administrador
-    is_blocked = db.Column(db.Boolean, default=False)  # Nuevo: usuario bloqueado
+    is_admin = db.Column(db.Boolean, default=False)
+    is_blocked = db.Column(db.Boolean, default=False)
+    security_question = db.Column(db.String(200), nullable=True)  # Pregunta de seguridad
+    security_answer = db.Column(db.String(200), nullable=True)    # Respuesta (hasheada)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # Relaciones
     songs = db.relationship('Song', backref='author', lazy=True, cascade='all, delete-orphan')
     playlists = db.relationship('Playlist', backref='owner', lazy=True, cascade='all, delete-orphan')
 
