@@ -1,24 +1,20 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, abort
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, Song, Playlist, PlaylistSong
 import secrets
 import re
 
-# ========== CONFIGURACIÓN ==========
 app = Flask(__name__)
 
-# Clave secreta: intenta leer del entorno, si no, usa una fija (cámbiala en producción)
+# Configuración
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'clave-por-defecto-cambiar-en-produccion')
-
-# Base de datos SQLite con ruta absoluta dentro del directorio de la aplicación
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(basedir, 'cancionero.db')
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Inicializar extensiones
 db.init_app(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -28,9 +24,30 @@ login_manager.login_view = 'login'
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# Crear tablas si no existen (con contexto de aplicación)
 with app.app_context():
     db.create_all()
+    # Crear superusuario por defecto si no existe
+    admin = User.query.filter_by(username='admin').first()
+    if not admin:
+        admin = User(
+            username='admin',
+            password_hash=generate_password_hash('admin123'),
+            is_admin=True,
+            is_blocked=False
+        )
+        db.session.add(admin)
+        db.session.commit()
+        print("Superusuario 'admin' creado con contraseña 'admin123'")
+
+# ========== DECORADOR PARA VERIFICAR ADMIN ==========
+def admin_required(f):
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.is_admin:
+            flash('Acceso denegado. Se requieren permisos de administrador.', 'danger')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    decorated_function.__name__ = f.__name__
+    return decorated_function
 
 # ========== RUTAS PÚBLICAS ==========
 @app.route('/')
@@ -62,12 +79,6 @@ def index():
                          selected_time=category_time,
                          search=search)
 
-@app.route('/song/<int:song_id>')
-def view_song(song_id):
-    song = Song.query.get_or_404(song_id)
-    return render_template('index.html', song_to_view=song, songs=[], 
-                         orden_misa_opciones=[], tiempo_liturgico_opciones=[])
-
 # ========== AUTENTICACIÓN ==========
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -80,6 +91,11 @@ def login():
         user = User.query.filter_by(username=username).first()
         
         if user and check_password_hash(user.password_hash, password):
+            # Verificar si el usuario está bloqueado
+            if user.is_blocked:
+                flash('Esta cuenta ha sido bloqueada. Contacta al administrador.', 'danger')
+                return render_template('login.html')
+            
             login_user(user)
             flash('Inicio de sesión exitoso', 'success')
             next_page = request.args.get('next')
@@ -124,6 +140,11 @@ def logout():
 @app.route('/create_song', methods=['GET', 'POST'])
 @login_required
 def create_song():
+    # Verificar si el usuario está bloqueado
+    if current_user.is_blocked:
+        flash('Tu cuenta está bloqueada. No puedes crear canciones.', 'danger')
+        return redirect(url_for('index'))
+    
     if request.method == 'POST':
         title = request.form['title']
         lyrics = request.form['lyrics']
@@ -158,8 +179,15 @@ def create_song():
 @login_required
 def edit_song(song_id):
     song = Song.query.get_or_404(song_id)
-    if song.user_id != current_user.id:
+    
+    # Permitir edición si es el autor O si es administrador
+    if song.user_id != current_user.id and not current_user.is_admin:
         flash('No tienes permiso para editar esta canción', 'danger')
+        return redirect(url_for('index'))
+    
+    # Verificar si el usuario está bloqueado (excepto admin)
+    if current_user.is_blocked and not current_user.is_admin:
+        flash('Tu cuenta está bloqueada.', 'danger')
         return redirect(url_for('index'))
     
     if request.method == 'POST':
@@ -169,7 +197,7 @@ def edit_song(song_id):
         song.category_time = request.form['category_time']
         db.session.commit()
         flash('Canción actualizada', 'success')
-        return redirect(url_for('my_songs'))
+        return redirect(url_for('my_songs') if song.user_id == current_user.id else url_for('admin_songs'))
     
     orden_misa_opciones = ['entrada', 'piedad', 'gloria', 'aclamación del evangelio', 
                           'ofertorio', 'santo', 'cordero', 'comunión', 'salida', 'extras']
@@ -184,25 +212,80 @@ def edit_song(song_id):
 @login_required
 def delete_song(song_id):
     song = Song.query.get_or_404(song_id)
-    if song.user_id != current_user.id:
+    
+    # Permitir eliminación si es el autor O si es administrador
+    if song.user_id != current_user.id and not current_user.is_admin:
         flash('No autorizado', 'danger')
         return redirect(url_for('index'))
     
     db.session.delete(song)
     db.session.commit()
     flash('Canción eliminada', 'success')
-    return redirect(url_for('my_songs'))
+    return redirect(url_for('my_songs') if song.user_id == current_user.id else url_for('admin_songs'))
 
 @app.route('/my_songs')
 @login_required
 def my_songs():
+    if current_user.is_blocked:
+        flash('Tu cuenta está bloqueada.', 'danger')
+        return redirect(url_for('index'))
+    
     songs = Song.query.filter_by(user_id=current_user.id).order_by(Song.title).all()
     return render_template('my_songs.html', songs=songs)
+
+# ========== ADMINISTRACIÓN ==========
+@app.route('/admin/dashboard')
+@login_required
+@admin_required
+def admin_dashboard():
+    total_users = User.query.count()
+    total_songs = Song.query.count()
+    blocked_users = User.query.filter_by(is_blocked=True).count()
+    
+    return render_template('admin_dashboard.html', 
+                         total_users=total_users,
+                         total_songs=total_songs,
+                         blocked_users=blocked_users)
+
+@app.route('/admin/users')
+@login_required
+@admin_required
+def admin_users():
+    users = User.query.order_by(User.created_at.desc()).all()
+    return render_template('admin_users.html', users=users)
+
+@app.route('/admin/toggle_block/<int:user_id>')
+@login_required
+@admin_required
+def admin_toggle_block(user_id):
+    user = User.query.get_or_404(user_id)
+    
+    # No permitir bloquear al propio admin
+    if user.id == current_user.id:
+        flash('No puedes bloquearte a ti mismo', 'danger')
+        return redirect(url_for('admin_users'))
+    
+    user.is_blocked = not user.is_blocked
+    db.session.commit()
+    status = 'bloqueado' if user.is_blocked else 'desbloqueado'
+    flash(f'Usuario {user.username} {status} exitosamente', 'success')
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/songs')
+@login_required
+@admin_required
+def admin_songs():
+    songs = Song.query.order_by(Song.created_at.desc()).all()
+    return render_template('admin_songs.html', songs=songs)
 
 # ========== PLANIFICAR MISA ==========
 @app.route('/plan_misa')
 @login_required
 def plan_misa():
+    if current_user.is_blocked:
+        flash('Tu cuenta está bloqueada.', 'danger')
+        return redirect(url_for('index'))
+    
     playlists = Playlist.query.filter_by(user_id=current_user.id).all()
     all_songs = Song.query.order_by(Song.title).all()
     return render_template('plan_misa.html', playlists=playlists, all_songs=all_songs)
@@ -210,6 +293,10 @@ def plan_misa():
 @app.route('/create_playlist', methods=['POST'])
 @login_required
 def create_playlist():
+    if current_user.is_blocked:
+        flash('Tu cuenta está bloqueada.', 'danger')
+        return redirect(url_for('index'))
+    
     name = request.form['name']
     if not name:
         flash('Nombre de lista requerido', 'danger')
@@ -277,6 +364,5 @@ def delete_playlist(playlist_id):
     flash('Lista eliminada', 'success')
     return redirect(url_for('plan_misa'))
 
-# ========== EJECUCIÓN LOCAL (NO AFECTA EN PYTHONANYWHERE) ==========
 if __name__ == '__main__':
     app.run(debug=True)

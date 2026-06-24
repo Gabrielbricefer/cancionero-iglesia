@@ -90,3 +90,33 @@
         padding: 0.25rem 0.5rem;
     }
 }
+
+/* Estilos para administración */
+.badge.bg-danger {
+    background-color: #dc3545 !important;
+}
+
+.badge.bg-success {
+    background-color: #28a745 !important;
+}
+
+.badge.bg-warning {
+    background-color: #ffc107 !important;
+    color: #000 !important;
+}
+
+.table th {
+    background-color: #f8f9fa;
+}
+
+.btn-group .btn {
+    margin-right: 5px;
+}
+
+.admin-dashboard .card {
+    transition: transform 0.3s;
+}
+
+.admin-dashboard .card:hover {
+    transform: translateY(-5px);
+}

@@ -9,6 +9,8 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
+    is_admin = db.Column(db.Boolean, default=False)  # Nuevo: es administrador
+    is_blocked = db.Column(db.Boolean, default=False)  # Nuevo: usuario bloqueado
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relaciones
@@ -19,9 +21,9 @@ class Song(db.Model):
     __tablename__ = 'songs'
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
-    lyrics = db.Column(db.Text, nullable=False)  # Texto con acordes en formato [Acorde]
-    category_order = db.Column(db.String(50), nullable=False)  # entrada, gloria, etc.
-    category_time = db.Column(db.String(50), nullable=False)   # adviento, navidad, etc.
+    lyrics = db.Column(db.Text, nullable=False)
+    category_order = db.Column(db.String(50), nullable=False)
+    category_time = db.Column(db.String(50), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -34,7 +36,6 @@ class Playlist(db.Model):
     share_token = db.Column(db.String(100), unique=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # Relación ordenada con canciones
     songs = db.relationship('PlaylistSong', backref='playlist', lazy=True, cascade='all, delete-orphan')
 
 class PlaylistSong(db.Model):
@@ -44,5 +45,4 @@ class PlaylistSong(db.Model):
     song_id = db.Column(db.Integer, db.ForeignKey('songs.id'), nullable=False)
     order_position = db.Column(db.Integer, nullable=False)
     
-    # Relación para acceder a la canción fácilmente
     song = db.relationship('Song')

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Gestión de Usuarios</h1>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Volver al Panel
+    </a>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Usuario</th>
+                <th>Rol</th>
+                <th>Estado</th>
+                <th>Fecha Registro</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user.id }}</td>
+                <td><strong>{{ user.username }}</strong></td>
+                <td>
+                    {% if user.is_admin %}
+                        <span class="badge bg-danger">Administrador</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Usuario</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if user.is_blocked %}
+                        <span class="badge bg-danger">Bloqueado</span>
+                    {% else %}
+                        <span class="badge bg-success">Activo</span>
+                    {% endif %}
+                </td>
+                <td>{{ user.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td>
+                    {% if not user.is_admin %}
+                        <a href="{{ url_for('admin_toggle_block', user_id=user.id) }}" 
+                           class="btn btn-sm {% if user.is_blocked %}btn-success{% else %}btn-warning{% endif %}"
+                           onclick="return confirm('¿Estás seguro de {% if user.is_blocked %}desbloquear{% else %}bloquear{% endif %} a {{ user.username }}?')">
+                            {% if user.is_blocked %}
+                                <i class="bi bi-unlock"></i> Desbloquear
+                            {% else %}
+                                <i class="bi bi-lock"></i> Bloquear
+                            {% endif %}
+                        </a>
+                    {% else %}
+                        <span class="text-muted">No se puede modificar</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

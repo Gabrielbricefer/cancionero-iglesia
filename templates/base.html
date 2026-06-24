@@ -29,6 +29,13 @@
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('plan_misa') }}">Planificar Misa</a>
                         </li>
+                        {% if current_user.is_authenticated and current_user.is_admin %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('admin_dashboard') }}">
+                                    <i class="bi bi-shield-lock"></i> Admin
+                                </a>
+                            </li>
+                        {% endif %}
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('logout') }}">Cerrar Sesión ({{ current_user.username }})</a>
                         </li>
