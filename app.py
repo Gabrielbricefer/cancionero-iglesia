@@ -26,18 +26,20 @@ def load_user(user_id):
 
 with app.app_context():
     db.create_all()
-    # Crear superusuario por defecto si no existe
-    admin = User.query.filter_by(username='admin').first()
-    if not admin:
-        admin = User(
-            username='admin',
-            password_hash=generate_password_hash('admin123'),
-            is_admin=True,
-            is_blocked=False
-        )
-        db.session.add(admin)
-        db.session.commit()
-        print("Superusuario 'admin' creado con contraseña 'admin123'")
+    
+    # ========== CREAR SUPERUSUARIO POR DEFECTO ==========
+    # Comentado para evitar creación automática del usuario 'admin'
+    # admin = User.query.filter_by(username='admin').first()
+    # if not admin:
+    #     admin = User(
+    #         username='admin',
+    #         password_hash=generate_password_hash('admin123'),
+    #         is_admin=True,
+    #         is_blocked=False
+    #     )
+    #     db.session.add(admin)
+    #     db.session.commit()
+    #     print("Superusuario 'admin' creado con contraseña 'admin123'")
 
 # ========== DECORADOR PARA VERIFICAR ADMIN ==========
 def admin_required(f):
