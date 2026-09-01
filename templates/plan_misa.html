@@ -1,11 +1,29 @@
 {% extends "base.html" %}
+
 {% block content %}
-<h2>Planificar Misa</h2>
+<h2>📋 Planificar Misa</h2>
+
+<div class="row">
+    <div class="col-md-12">
+        <!-- Buscador de listas -->
+        <div class="card mb-4">
+            <div class="card-header bg-light">
+                <h5>🔍 Buscar Listas</h5>
+            </div>
+            <div class="card-body">
+                <input type="text" id="searchPlaylist" class="form-control" placeholder="Buscar lista por nombre...">
+            </div>
+        </div>
+    </div>
+</div>
 
 <div class="row">
     <div class="col-md-6">
+        <!-- Crear nueva lista -->
         <div class="card mb-4">
-            <div class="card-header">Crear nueva lista</div>
+            <div class="card-header bg-success text-white">
+                <h5>➕ Crear nueva lista</h5>
+            </div>
             <div class="card-body">
                 <form method="POST" action="{{ url_for('create_playlist') }}">
                     <div class="input-group">
@@ -16,61 +34,297 @@
             </div>
         </div>
         
-        <h4>Mis Listas</h4>
-        {% if playlists %}
-            {% for pl in playlists %}
-                <div class="card mb-3">
-                    <div class="card-header d-flex justify-content-between">
-                        <strong>{{ pl.name }}</strong>
-                        <div>
-                            <a href="{{ url_for('shared_playlist', token=pl.share_token) }}" class="btn btn-sm btn-info" target="_blank">Compartir</a>
-                            <a href="{{ url_for('delete_playlist', playlist_id=pl.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Eliminar lista?')">Eliminar</a>
+        <h4>📂 Mis Listas</h4>
+        <div id="playlistContainer">
+            {% if playlists %}
+                {% for pl in playlists|sort(attribute='created_at', reverse=True) %}
+                    <div class="card mb-3 playlist-card" data-playlist-name="{{ pl.name|lower }}">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <strong>{{ pl.name }}</strong>
+                            <div>
+                                <span class="badge bg-secondary">{{ pl.songs|length }} canciones</span>
+                                <a href="{{ url_for('shared_playlist', token=pl.share_token) }}" class="btn btn-sm btn-info" target="_blank">🔗 Compartir</a>
+                                <a href="{{ url_for('delete_playlist', playlist_id=pl.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('¿Eliminar lista?')">🗑️</a>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- LISTA DE CANCIONES (ordenable) -->
+                            <div class="sortable-container" data-playlist-id="{{ pl.id }}">
+                                <ul class="list-group sortable-list" id="sortable-{{ pl.id }}">
+                                    {% set playlist_songs = pl.songs|sort(attribute='order_position') %}
+                                    {% if playlist_songs %}
+                                        {% for ps in playlist_songs %}
+                                            <li class="list-group-item d-flex justify-content-between align-items-center song-item" 
+                                                data-playlist-song-id="{{ ps.id }}"
+                                                data-song-id="{{ ps.song.id }}">
+                                                <div>
+                                                    <i class="bi bi-grip-vertical drag-handle" style="cursor: grab; color: #6c757d; margin-right: 8px;"></i>
+                                                    <strong>{{ ps.song.title }}</strong>
+                                                    <span class="badge bg-secondary ms-2">{{ ps.song.category_order }}</span>
+                                                    <span class="badge bg-info">{{ ps.song.category_time }}</span>
+                                                </div>
+                                                <a href="{{ url_for('remove_song_from_playlist', playlist_song_id=ps.id) }}" class="btn btn-sm btn-outline-danger">✖</a>
+                                            </li>
+                                        {% endfor %}
+                                    {% else %}
+                                        <li class="list-group-item text-muted text-center empty-message">No hay canciones en esta lista.</li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                            
+                            <hr>
+                            
+                            <!-- FORMULARIO PARA AGREGAR CANCIONES CON BUSCADOR -->
+                            <form method="POST" action="{{ url_for('add_song_to_playlist') }}" class="mt-2 add-song-form">
+                                <input type="hidden" name="playlist_id" value="{{ pl.id }}">
+                                
+                                <div class="mb-2">
+                                    <input type="text" class="form-control form-control-sm song-filter-select" 
+                                           placeholder="🔍 Buscar canción por nombre o categoría..." 
+                                           data-playlist-id="{{ pl.id }}">
+                                </div>
+                                
+                                <div class="input-group">
+                                    <select name="song_id" class="form-select song-select" data-playlist-id="{{ pl.id }}" required>
+                                        <option value="">Seleccionar canción</option>
+                                        {% for song in all_songs %}
+                                            <option value="{{ song.id }}" 
+                                                    data-title="{{ song.title|lower }}"
+                                                    data-category="{{ song.category_order|lower }}">
+                                                {{ song.title }} ({{ song.author.username }}) - {{ song.category_order }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                    <button type="submit" class="btn btn-primary">➕ Agregar</button>
+                                </div>
+                            </form>
                         </div>
                     </div>
-                    <div class="card-body">
-                        <h6>Canciones en esta lista:</h6>
-                        {% set playlist_songs = pl.songs|sort(attribute='order_position') %}
-                        {% if playlist_songs %}
-                            <ul class="list-group">
-                                {% for ps in playlist_songs %}
-                                    <li class="list-group-item d-flex justify-content-between">
-                                        {{ ps.song.title }}
-                                        <a href="{{ url_for('remove_song_from_playlist', playlist_song_id=ps.id) }}" class="btn btn-sm btn-outline-danger">Quitar</a>
-                                    </li>
-                                {% endfor %}
-                            </ul>
-                        {% else %}
-                            <p class="text-muted">Sin canciones aún.</p>
-                        {% endif %}
-                        <hr>
-                        <form method="POST" action="{{ url_for('add_song_to_playlist') }}" class="mt-2">
-                            <input type="hidden" name="playlist_id" value="{{ pl.id }}">
-                            <div class="input-group">
-                                <select name="song_id" class="form-select" required>
-                                    <option value="">Seleccionar canción</option>
-                                    {% for song in all_songs %}
-                                        <option value="{{ song.id }}">{{ song.title }} ({{ song.author.username }})</option>
-                                    {% endfor %}
-                                </select>
-                                <button type="submit" class="btn btn-primary">Agregar</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            {% endfor %}
-        {% else %}
-            <p>No tienes listas creadas.</p>
-        {% endif %}
+                {% endfor %}
+            {% else %}
+                <div class="alert alert-info">No tienes listas creadas. ¡Crea una arriba!</div>
+            {% endif %}
+        </div>
     </div>
     
     <div class="col-md-6">
         <div class="card">
-            <div class="card-header">Enlace compartible</div>
+            <div class="card-header bg-light">
+                <h5>ℹ️ Información</h5>
+            </div>
             <div class="card-body">
-                <p>Para compartir una lista, haz clic en "Compartir" y envía el enlace a los músicos.</p>
-                <p>El enlace permite ver la lista sin necesidad de iniciar sesión.</p>
+                <p><strong>📌 Reordenar canciones:</strong> Arrastra las canciones con el icono <i class="bi bi-grip-vertical"></i> para cambiar su orden.</p>
+                <p><strong>🔍 Buscar canciones:</strong> Usa el campo de búsqueda dentro de cada lista para encontrar canciones disponibles.</p>
+                <p><strong>🔗 Compartir lista:</strong> Haz clic en "Compartir" para obtener un enlace público.</p>
+                <p><strong>📋 Buscar listas:</strong> Usa el buscador superior para encontrar listas por nombre.</p>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Incluir SortableJS para drag and drop -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // ============================================================
+    // 1. BUSCADOR DE LISTAS
+    // ============================================================
+    const searchPlaylist = document.getElementById('searchPlaylist');
+    const playlistCards = document.querySelectorAll('.playlist-card');
+    
+    searchPlaylist.addEventListener('input', function() {
+        const query = this.value.toLowerCase().trim();
+        playlistCards.forEach(card => {
+            const name = card.dataset.playlistName || '';
+            card.style.display = (name.includes(query) || query === '') ? 'block' : 'none';
+        });
+    });
+
+    // ============================================================
+    // 2. FILTRO DE CANCIONES DISPONIBLES (dentro del select)
+    // ============================================================
+    document.querySelectorAll('.song-filter-select').forEach(filterInput => {
+        filterInput.addEventListener('input', function() {
+            const query = this.value.toLowerCase().trim();
+            const playlistId = this.dataset.playlistId;
+            const select = document.querySelector(`.song-select[data-playlist-id="${playlistId}"]`);
+            if (!select) return;
+            
+            const options = select.querySelectorAll('option');
+            let hasVisible = false;
+            
+            options.forEach(opt => {
+                if (opt.value === '') return;
+                const title = opt.dataset.title || '';
+                const category = opt.dataset.category || '';
+                const match = title.includes(query) || category.includes(query) || query === '';
+                opt.style.display = match ? 'block' : 'none';
+                if (match) hasVisible = true;
+            });
+            
+            const existingMsg = select.parentElement.querySelector('.no-results-msg');
+            if (!hasVisible && query !== '') {
+                if (!existingMsg) {
+                    const msg = document.createElement('div');
+                    msg.className = 'no-results-msg text-muted small mt-1';
+                    msg.textContent = 'No hay canciones que coincidan con la búsqueda.';
+                    select.parentElement.appendChild(msg);
+                }
+            } else if (existingMsg) {
+                existingMsg.remove();
+            }
+        });
+    });
+
+    // ============================================================
+    // 3. DRAG AND DROP (SORTABLE) - CON DEPURACIÓN
+    // ============================================================
+    // Verificar que Sortable está disponible
+    if (typeof Sortable === 'undefined') {
+        console.error('❌ SortableJS no está cargado. Verifica el CDN.');
+        return;
+    }
+
+    const sortableLists = document.querySelectorAll('.sortable-list');
+    console.log(`🔍 Encontradas ${sortableLists.length} listas para ordenar.`);
+
+    sortableLists.forEach(list => {
+        const playlistId = list.id.replace('sortable-', '');
+        console.log(`✅ Inicializando Sortable para lista ID: ${playlistId}`);
+
+        // Verificar que hay elementos con handle
+        const handles = list.querySelectorAll('.drag-handle');
+        console.log(`   - Handles encontrados: ${handles.length}`);
+
+        new Sortable(list, {
+            handle: '.drag-handle',
+            animation: 150,
+            ghostClass: 'bg-light',
+            onEnd: function(evt) {
+                console.log('🔄 Reordenando lista:', playlistId);
+                const items = list.querySelectorAll('.song-item');
+                const order = [];
+                items.forEach((item, index) => {
+                    const psId = item.dataset.playlistSongId;
+                    if (psId) {
+                        order.push({ id: psId, position: index });
+                    }
+                });
+                
+                console.log('📤 Enviando orden:', order);
+                
+                fetch('/reorder_playlist_songs', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        playlist_id: playlistId,
+                        order: order
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast('✅ Orden actualizado correctamente', 'success');
+                    } else {
+                        // Mostrar el error específico del servidor
+                        showToast('❌ Error: ' + (data.error || 'Error desconocido'), 'danger');
+                        console.error('Error del servidor:', data);
+                    }
+                })
+                .catch(error => {
+                    showToast('❌ Error de red: ' + error.message, 'danger');
+                    console.error('Error de red:', error);
+                });
+            }
+        });
+    });
+
+    // ============================================================
+    // 4. NOTIFICACIONES (TOAST)
+    // ============================================================
+    function showToast(message, type = 'success') {
+        const colors = {
+            success: 'bg-success text-white',
+            danger: 'bg-danger text-white',
+            warning: 'bg-warning text-dark',
+            info: 'bg-info text-white'
+        };
+        
+        const toast = document.createElement('div');
+        toast.className = `toast align-items-center ${colors[type] || colors.info} border-0`;
+        toast.role = 'alert';
+        toast.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">${message}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        `;
+        
+        let container = document.getElementById('toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toast-container';
+            container.className = 'position-fixed bottom-0 end-0 p-3';
+            container.style.zIndex = '1050';
+            document.body.appendChild(container);
+        }
+        container.appendChild(toast);
+        
+        const bsToast = new bootstrap.Toast(toast, { delay: 3000 });
+        bsToast.show();
+        
+        setTimeout(() => {
+            toast.remove();
+        }, 3500);
+    }
+});
+</script>
+
+<style>
+/* Estilos para drag and drop */
+.drag-handle {
+    cursor: grab;
+    color: #6c757d;
+    margin-right: 8px;
+    font-size: 1.2rem;
+}
+.drag-handle:active {
+    cursor: grabbing;
+}
+.sortable-list .list-group-item {
+    transition: background-color 0.2s;
+}
+.sortable-list .list-group-item:hover {
+    background-color: #f8f9fa;
+}
+.sortable-list .list-group-item.sortable-chosen {
+    background-color: #e9ecef !important;
+}
+.sortable-list .list-group-item.sortable-ghost {
+    opacity: 0.5;
+    background-color: #dee2e6 !important;
+}
+.no-results-msg {
+    padding: 4px 8px;
+    color: #6c757d;
+    font-style: italic;
+}
+/* Buscador de listas */
+#searchPlaylist {
+    border-color: #ced4da;
+}
+#searchPlaylist:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+/* Toast container */
+#toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1050;
+}
+</style>
 {% endblock %}

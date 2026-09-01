@@ -8,13 +8,7 @@
 .song-lyrics .chord {
     color: #d9534f;
     font-weight: bold;
-    background-color: #f8f9fa;
-    padding: 2px 6px;
-    border-radius: 4px;
-    display: inline-block;
-    margin: 0 2px;
-    border: 1px solid #e9ecef;
-    font-size: 1.05rem;
+    background-color: rgba(217, 83, 79, 0.1); /* Fondo muy sutil */
 }
 
 .song-lyrics .chord:hover {
@@ -120,3 +114,4 @@
 .admin-dashboard .card:hover {
     transform: translateY(-5px);
 }
+

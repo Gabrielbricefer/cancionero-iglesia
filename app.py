@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, Song, Playlist, PlaylistSong
@@ -488,5 +488,37 @@ def delete_playlist(playlist_id):
     flash('Lista eliminada', 'success')
     return redirect(url_for('plan_misa'))
 
+@app.route('/reorder_playlist_songs', methods=['POST'])
+@login_required
+def reorder_playlist_songs():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No se recibieron datos'}), 400
+
+        playlist_id = data.get('playlist_id')
+        order = data.get('order')
+
+        if not playlist_id or not order:
+            return jsonify({'success': False, 'error': 'Datos incompletos'}), 400
+
+        playlist = Playlist.query.get_or_404(playlist_id)
+        if playlist.user_id != current_user.id:
+            return jsonify({'success': False, 'error': 'No autorizado'}), 403
+
+        for item in order:
+            ps = PlaylistSong.query.get(item['id'])
+            if ps and ps.playlist_id == int(playlist_id):
+                ps.order_position = item['position']
+
+        db.session.commit()
+        return jsonify({'success': True})
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Error en reorder: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=True)
+
