@@ -39,19 +39,49 @@
 <div class="row">
     <div class="col-md-6">
         <h3>Lista de Canciones</h3>
-        {% if songs %}
+        {% if songs.items %}
             <div class="list-group">
-                {% for song in songs %}
-                    <a href="#" class="list-group-item list-group-item-action song-item" 
-                       data-id="{{ song.id }}"
-                       data-title="{{ song.title|replace('\\', '\\\\')|replace('"', '\\"') }}"
-                       data-lyrics="{{ song.lyrics|replace('\\', '\\\\')|replace('"', '\\"') }}">
-                        <strong>{{ song.title }}</strong> 
+                {% for song in songs.items %}
+                    <a href="#" class="list-group-item list-group-item-action song-item"
+                    data-id="{{ song.id }}"
+                    data-title="{{ song.title|replace('\\', '\\\\')|replace('"', '\\"') }}"
+                    data-lyrics="{{ song.lyrics|replace('\\', '\\\\')|replace('"', '\\"') }}">
+                        <strong>{{ song.title }}</strong>
                         <span class="badge bg-secondary">{{ song.category_order }}</span>
                         <span class="badge bg-info">{{ song.category_time }}</span>
                         <small class="text-muted d-block">por {{ song.author.username }}</small>
                     </a>
                 {% endfor %}
+            </div>
+
+            <!-- Paginación -->
+            <nav aria-label="Paginación de canciones" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    <!-- Anterior -->
+                    <li class="page-item {% if not songs.has_prev %}disabled{% endif %}">
+                        <a class="page-link" href="{{ url_for('index', page=songs.prev_num, order=selected_order, time=selected_time, search=search) if songs.has_prev else '#' }}">Anterior</a>
+                    </li>
+
+                    <!-- Números de página -->
+                    {% for page_num in songs.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                        {% if page_num %}
+                            <li class="page-item {% if page_num == songs.page %}active{% endif %}">
+                                <a class="page-link" href="{{ url_for('index', page=page_num, order=selected_order, time=selected_time, search=search) }}">{{ page_num }}</a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">…</span></li>
+                        {% endif %}
+                    {% endfor %}
+
+                    <!-- Siguiente -->
+                    <li class="page-item {% if not songs.has_next %}disabled{% endif %}">
+                        <a class="page-link" href="{{ url_for('index', page=songs.next_num, order=selected_order, time=selected_time, search=search) if songs.has_next else '#' }}">Siguiente</a>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="text-center text-muted small">
+                Mostrando {{ songs.first }} - {{ songs.last }} de {{ songs.total }} canciones
             </div>
         {% else %}
             <p>No hay canciones disponibles.</p>

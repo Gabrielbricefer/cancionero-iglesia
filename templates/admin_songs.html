@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>Gestión de Canciones</h1>
+    <h1>📚 Gestión de Canciones</h1>
     <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">
         <i class="bi bi-arrow-left"></i> Volver al Panel
     </a>
@@ -21,31 +21,74 @@
             </tr>
         </thead>
         <tbody>
-            {% for song in songs %}
-            <tr>
-                <td>{{ song.id }}</td>
-                <td><strong>{{ song.title }}</strong></td>
-                <td>{{ song.author.username }}</td>
-                <td>
-                    <span class="badge bg-secondary">{{ song.category_order }}</span>
-                    <span class="badge bg-info">{{ song.category_time }}</span>
-                </td>
-                <td>{{ song.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
-                <td>
-                    <div class="btn-group btn-group-sm">
-                        <a href="{{ url_for('edit_song', song_id=song.id) }}" class="btn btn-warning">
-                            <i class="bi bi-pencil"></i> Editar
-                        </a>
-                        <a href="{{ url_for('delete_song', song_id=song.id) }}" 
-                           class="btn btn-danger"
-                           onclick="return confirm('¿Estás seguro de eliminar la canción "{{ song.title }}"?')">
-                            <i class="bi bi-trash"></i> Eliminar
-                        </a>
-                    </div>
-                </td>
-            </tr>
-            {% endfor %}
+            {% if songs.items %}
+                {% for song in songs.items %}
+                <tr>
+                    <td>{{ song.id }}</td>
+                    <td><strong>{{ song.title }}</strong></td>
+                    <td>{{ song.author.username }}</td>
+                    <td>
+                        <span class="badge bg-secondary">{{ song.category_order }}</span>
+                        <span class="badge bg-info">{{ song.category_time }}</span>
+                    </td>
+                    <td>{{ song.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <a href="{{ url_for('edit_song', song_id=song.id) }}" class="btn btn-warning">
+                                <i class="bi bi-pencil"></i> Editar
+                            </a>
+                            <a href="{{ url_for('delete_song', song_id=song.id) }}"
+                               class="btn btn-danger"
+                               onclick="return confirm('¿Estás seguro de eliminar la canción "{{ song.title }}"?')">
+                                <i class="bi bi-trash"></i> Eliminar
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted">No hay canciones registradas.</td>
+                </tr>
+            {% endif %}
         </tbody>
     </table>
 </div>
+
+<!-- PAGINACIÓN -->
+{% if songs.items and songs.total > 0 %}
+    <nav aria-label="Paginación de canciones" class="mt-4">
+        <ul class="pagination justify-content-center">
+            <!-- Anterior -->
+            <li class="page-item {% if not songs.has_prev %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('admin_songs', page=songs.prev_num) if songs.has_prev else '#' }}">
+                    <i class="bi bi-chevron-left"></i> Anterior
+                </a>
+            </li>
+
+            <!-- Números de página -->
+            {% for page_num in songs.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if page_num %}
+                    <li class="page-item {% if page_num == songs.page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('admin_songs', page=page_num) }}">{{ page_num }}</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                {% endif %}
+            {% endfor %}
+
+            <!-- Siguiente -->
+            <li class="page-item {% if not songs.has_next %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('admin_songs', page=songs.next_num) if songs.has_next else '#' }}">
+                    Siguiente <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <div class="text-center text-muted small">
+        Mostrando <strong>{{ songs.first }}</strong> - <strong>{{ songs.last }}</strong> de <strong>{{ songs.total }}</strong> canciones
+    </div>
+{% endif %}
+
 {% endblock %}

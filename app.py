@@ -55,32 +55,38 @@ def admin_required(f):
 # ========== RUTAS PÚBLICAS ==========
 @app.route('/')
 def index():
+    page = request.args.get('page', 1, type=int)  # Página actual (por defecto 1)
+    per_page = 10  # Canciones por página (ajústalo a tu gusto)
+
     query = Song.query
     category_order = request.args.get('order')
     category_time = request.args.get('time')
     search = request.args.get('search')
-    
+
     if category_order and category_order != '':
         query = query.filter_by(category_order=category_order)
     if category_time and category_time != '':
         query = query.filter_by(category_time=category_time)
     if search:
         query = query.filter(Song.title.contains(search) | Song.lyrics.contains(search))
-    
-    songs = query.order_by(Song.title).all()
-    
-    orden_misa_opciones = ['entrada', 'piedad', 'gloria', 'aclamación del evangelio', 
+
+    # Paginación
+    paginated_songs = query.order_by(Song.title).paginate(page=page, per_page=per_page, error_out=False)
+
+    orden_misa_opciones = ['entrada', 'piedad', 'gloria', 'aclamación del evangelio',
                           'ofertorio', 'santo', 'cordero', 'comunión', 'salida', 'extras']
-    tiempo_liturgico_opciones = ['adviento', 'navidad', 'tiempo ordinario', 
+    tiempo_liturgico_opciones = ['adviento', 'navidad', 'tiempo ordinario',
                                 'cuaresma', 'triduo pascual', 'pascua', 'extra']
-    
-    return render_template('index.html', 
-                         songs=songs, 
+
+    return render_template('index.html',
+                         songs=paginated_songs,
                          orden_misa_opciones=orden_misa_opciones,
                          tiempo_liturgico_opciones=tiempo_liturgico_opciones,
                          selected_order=category_order,
                          selected_time=category_time,
-                         search=search)
+                         search=search,
+                         page=page,
+                         per_page=per_page)
 
 # ========== AUTENTICACIÓN ==========
 @app.route('/login', methods=['GET', 'POST'])
@@ -354,9 +360,14 @@ def my_songs():
     if current_user.is_blocked:
         flash('Tu cuenta está bloqueada.', 'danger')
         return redirect(url_for('index'))
-    
-    songs = Song.query.filter_by(user_id=current_user.id).order_by(Song.title).all()
-    return render_template('my_songs.html', songs=songs)
+
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+
+    query = Song.query.filter_by(user_id=current_user.id)
+    paginated_songs = query.order_by(Song.title).paginate(page=page, per_page=per_page, error_out=False)
+
+    return render_template('my_songs.html', songs=paginated_songs, page=page, per_page=per_page)
 
 # ========== ADMINISTRACIÓN ==========
 @app.route('/admin/dashboard')
@@ -399,8 +410,13 @@ def admin_toggle_block(user_id):
 @login_required
 @admin_required
 def admin_songs():
-    songs = Song.query.order_by(Song.created_at.desc()).all()
-    return render_template('admin_songs.html', songs=songs)
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+
+    query = Song.query
+    paginated_songs = query.order_by(Song.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
+
+    return render_template('admin_songs.html', songs=paginated_songs, page=page, per_page=per_page)
 
 # ========== PLANIFICAR MISA ==========
 @app.route('/plan_misa')
